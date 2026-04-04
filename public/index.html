@@ -8,45 +8,46 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-
-    <!-- Encabezado con botones de navegación -->
     <header>
         <button class="nav-btn" onclick="mostrarSeccion('inicio')">INICIO</button>
         <button class="nav-btn" onclick="mostrarSeccion('visto')">VISTO</button>
         <button class="nav-btn" onclick="mostrarSeccion('no-visto')">NO VISTO</button>
         <button class="nav-btn" onclick="mostrarSeccion('abecedario')">ABC</button>
         <button class="nav-btn" onclick="mostrarSeccion('seccion-ruleta')">RANDOM</button>
-            <div class="buscador-container">
-                <input type="text" id="buscador-anime" placeholder="Buscar anime...">
-                <ul id="resultados-buscador" class="resultados-buscador"></ul>
-            </div>
+        <div class="buscador-container">
+            <input type="text" id="buscador-anime" placeholder="Buscar anime...">
+            <ul id="resultados-buscador" class="resultados-buscador"></ul>
+        </div>
+        <div id="auth-panel" class="auth-panel">
+            <span id="auth-status">Modo invitado</span>
+            <button id="login-btn" class="auth-btn">Iniciar sesión</button>
+            <button id="logout-btn" class="auth-btn oculto">Cerrar sesión</button>
+        </div>
     </header>
 
-    <!-- Secciones de contenido -->
     <div id="inicio" class="seccion">
-        <h2></h2>
-        <div class="form-container">
-            <h2>Agregar Anime</h2>
+        <div class="form-container" id="admin-form-container">
+            <h2>Agregar/Actualizar Anime (Admin)</h2>
             <form id="animeForm">
                 <div class="form-group">
                     <label for="nombre">Nombre del Anime</label>
                     <input type="text" id="nombre" name="nombre" required>
                 </div>
                 <div class="form-group">
-                    <label for="imagen_url">URL de la Imagen</label> <!-- ⬅️ Corregido -->
-                    <input type="text" id="imagen_url" name="imagen_url" required> <!-- ⬅️ Corregido -->
+                    <label for="imagen_url">URL de la Imagen</label>
+                    <input type="text" id="imagen_url" name="imagen_url" required>
                 </div>
                 <div class="form-group">
                     <label for="capitulos">Número de Capítulos</label>
                     <input type="number" id="capitulos" name="capitulos" required>
                 </div>
                 <div class="form-group">
-                    <label for="anio_emision">Año de Emisión</label> <!-- ⬅️ Corregido -->
-                    <input type="number" id="anio_emision" name="anio_emision" required> <!-- ⬅️ Corregido -->
+                    <label for="anio_emision">Año de Emisión</label>
+                    <input type="number" id="anio_emision" name="anio_emision" required>
                 </div>
                 <div class="form-group">
-                    <label for="sinopsis">Sinopsis</label> <!-- ⬅️ Corregido -->
-                    <input type="text" id="sinopsis" name="sinopsis" required> <!-- ⬅️ Corregido -->
+                    <label for="sinopsis">Sinopsis</label>
+                    <input type="text" id="sinopsis" name="sinopsis" required>
                 </div>
                 <div class="form-group">
                     <label for="estado">Estado</label>
@@ -56,64 +57,57 @@
                     </select>
                 </div>
                 <button type="submit" class="submit-btn">Agregar Anime</button>
-            </form>            
-        </div>        
-        <div id="inicio-animes"></div>
+            </form>
+        </div>
+        <p id="guest-admin-msg" class="info-msg oculto">Solo el administrador puede agregar o actualizar animes.</p>
     </div>
 
     <div id="visto" class="seccion">
-        <h2></h2>
+        <p id="login-required-visto" class="info-msg oculto">Inicia sesión para ver tu lista personal de animes vistos.</p>
         <div id="visto-animes"></div>
     </div>
 
     <div id="no-visto" class="seccion">
-        <h2></h2>
         <div id="no-visto-animes"></div>
     </div>
 
     <div id="abecedario" class="seccion">
         <h2>Lista de Animes</h2>
         <div class="abecedario-container">
-            <aside class="letras-navbar">
-                <!-- Letras de la A a la Z generadas dinámicamente con JS -->
-            </aside>
+            <aside class="letras-navbar"></aside>
             <div id="abecedario-animes"></div>
         </div>
     </div>
 
     <div id="seccion-ruleta" class="seccion">
         <h2>Ruleta de Animes</h2>
-        
         <div class="ruleta-container">
             <div class="ruleta-wrapper">
                 <div class="flecha"></div>
                 <div id="ruleta-box"></div>
             </div>
-            
             <button id="girarRuleta">Girar Ruleta</button>
         </div>
-    
         <div id="resultado-ruleta"></div>
     </div>
 
     <div id="anime-modal" class="modal oculto">
-    <div class="modal-contenido">
-        <span class="cerrar-modal">&times;</span>
-        <div class="modal-body">
-        <img id="modal-imagen" src="" alt="Imagen del anime">
-        <div class="modal-info">
-            <h3 id="modal-nombre">Nombre del anime</h3>
-            <p><strong>Año:</strong> <span id="modal-anio">2020</span></p>
-            <p><strong>Capítulos:</strong> <span id="modal-capitulos">12</span></p>
-            <p><strong>Estado:</strong> <span id="modal-estado">12</span></p>
-            <p id="modal-sinopsis">Aquí va la sinopsis.</p>
-            <button id="modal-estado-btn">Cambiar Estado</button>
+        <div class="modal-contenido">
+            <span class="cerrar-modal">&times;</span>
+            <div class="modal-body">
+                <img id="modal-imagen" src="" alt="Imagen del anime">
+                <div class="modal-info">
+                    <h3 id="modal-nombre">Nombre del anime</h3>
+                    <p><strong>Año:</strong> <span id="modal-anio">2020</span></p>
+                    <p><strong>Capítulos:</strong> <span id="modal-capitulos">12</span></p>
+                    <p><strong>Estado:</strong> <span id="modal-estado">NO VISTO</span></p>
+                    <p id="modal-sinopsis">Aquí va la sinopsis.</p>
+                    <button id="modal-estado-btn">Cambiar Estado</button>
+                </div>
+            </div>
         </div>
-        </div>
-    </div>
     </div>
 
     <script src="script.js" defer></script>
-
 </body>
 </html>

@@ -560,3 +560,9 @@ header {
 .cerrar-modal:hover {
   color: #fff;
 }
+
+.auth-panel { display:flex; align-items:center; gap:8px; }
+.auth-btn { background:#1976d2; color:#fff; border:none; padding:6px 10px; border-radius:6px; cursor:pointer; }
+#auth-status { font-size:12px; color:#ddd; }
+.info-msg { margin: 20px auto; max-width: 700px; color: #ffd166; }
+.oculto { display:none !important; }
