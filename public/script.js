@@ -585,10 +585,52 @@ document.getElementById("email-input").addEventListener("keydown", async (event)
     resultados.style.display = "block";
 });
 
-document.addEventListener("click", function (e) {
-    if (!e.target.closest(".buscador-container")) {
-        document.getElementById("resultados-buscador").style.display = "none";
+document.addEventListener("DOMContentLoaded", async () => {
+    mostrarSeccion("inicio");
+    generarAbecedario();
+
+    document.getElementById("girarRuleta").addEventListener("click", girarRuleta);
+    document.getElementById("login-btn").addEventListener("click", async () => {
+        const email = document.getElementById("email-input").value.trim();
+        if (!email) {
+            mostrarMensajeTemporal("Escribe tu correo para iniciar sesión");
+            return;
+        }
+
+        try {
+            await login(email);
+        } catch (error) {
+            mostrarMensajeTemporal(error.message);
+        }
+    });
+
+    document.getElementById("logout-btn").addEventListener("click", logout);
+    document.getElementById("choice-login").addEventListener("click", () => {
+        document.getElementById("auth-choice").classList.add("oculto");
+        document.getElementById("email-input").focus();
+        setAuthChoiceSeen();
+    });
+    document.getElementById("choice-guest").addEventListener("click", () => {
+        document.getElementById("auth-choice").classList.add("oculto");
+        setAuthChoiceSeen();
+        updateAuthUI();
+    });
+
+    const savedEmail = getStoredEmail();
+    if (savedEmail) {
+        try {
+            await login(savedEmail);
+            return;
+        } catch (error) {
+            clearStoredEmail();
+        }
     }
+
+    updateAuthUI();
+    if (!hasSeenAuthChoice()) {
+        document.getElementById("auth-choice").classList.remove("oculto");
+    }
+    await cargarAnimes();
 });
 
 window.mostrarSeccion = mostrarSeccion;
