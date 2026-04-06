@@ -1,31 +1,157 @@
-document.addEventListener("DOMContentLoaded", () => {
-    mostrarSeccion("inicio");
-    cargarAnimes();
-});
+const configuredApiBase = document.querySelector('meta[name="api-base"]')?.content?.trim();
+const API_BASE = configuredApiBase
+    || (window.location.hostname === "localhost"
+        ? "http://localhost:4000/api"
+        : `${window.location.origin}/api`);
 
-function mostrarSeccion(seccionId) {
-    document.querySelectorAll(".seccion").forEach(seccion => {
-        seccion.classList.remove("activa");
-    });
-    document.getElementById(seccionId).classList.add("activa");
+const state = {
+    user: null,
+    isAdmin: false,
+    allAnimes: []
+};
+
+const animeForm = document.getElementById("animeForm");
+
+const getStoredEmail = () => localStorage.getItem("anime_user_email") || "";
+const setStoredEmail = (email) => localStorage.setItem("anime_user_email", email);
+const clearStoredEmail = () => localStorage.removeItem("anime_user_email");
+const hasSeenAuthChoice = () => localStorage.getItem("auth_choice_seen") === "1";
+const setAuthChoiceSeen = () => localStorage.setItem("auth_choice_seen", "1");
+const normalizeEmail = (email) => String(email || "").trim().toLowerCase();
+const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(email));
+
+async function request(path, options = {}) {
+    const response = await fetch(`${API_BASE}${path}`, options);
+    const contentType = response.headers.get("content-type") || "";
+    const data = contentType.includes("application/json")
+        ? await response.json()
+        : { error: await response.text() };
+    if (!response.ok) {
+        throw new Error(data.error || data.message || "Error en la solicitud");
+    }
+    return data;
 }
 
-function cargarAnimes() {
-    fetch("https://animepage-production.up.railway.app/api/animes")
-        .then(response => response.json())
-        .then(animes => actualizarSecciones(animes))
-        .catch(error => console.error("Error al cargar animes:", error));
-        obtenerAnimesOrdenados();
+function mostrarSeccion(seccionId) {
+    document.querySelectorAll(".seccion").forEach((seccion) => {
+        seccion.classList.remove("activa");
+        seccion.style.display = "none";
+    });
+
+    const seccionActiva = document.getElementById(seccionId);
+    if (seccionActiva) {
+        seccionActiva.classList.add("activa");
+        seccionActiva.style.display = "block";
+    }
+
+    if (seccionId === "seccion-ruleta") actualizarRuleta();
+}
+
+function updateAuthUI() {
+    const authStatus = document.getElementById("auth-status");
+    const loginBtn = document.getElementById("login-btn");
+    const logoutBtn = document.getElementById("logout-btn");
+    const adminFormContainer = document.getElementById("admin-form-container");
+    const guestAdminMsg = document.getElementById("guest-admin-msg");
+    const emailInput = document.getElementById("email-input");
+    const authChoice = document.getElementById("auth-choice");
+
+    if (state.user) {
+        authStatus.textContent = state.isAdmin
+            ? `Admin: ${state.user.email}`
+            : `Usuario: ${state.user.email}`;
+        loginBtn.classList.add("oculto");
+        logoutBtn.classList.remove("oculto");
+        emailInput.classList.add("oculto");
+        authChoice.classList.add("oculto");
+    } else {
+        authStatus.textContent = "Modo invitado";
+        loginBtn.classList.remove("oculto");
+        logoutBtn.classList.add("oculto");
+        emailInput.classList.remove("oculto");
+    }
+
+    if (state.isAdmin) {
+        adminFormContainer.classList.remove("oculto");
+        guestAdminMsg.classList.add("oculto");
+    } else {
+        adminFormContainer.classList.add("oculto");
+        guestAdminMsg.classList.remove("oculto");
+    }
+}
+
+async function login(email) {
+    const normalizedEmail = normalizeEmail(email);
+    if (!isValidEmail(normalizedEmail)) {
+        throw new Error("Ingresa un correo válido");
+    }
+
+    const data = await request("/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: normalizedEmail })
+    });
+
+    state.user = data.user;
+    state.isAdmin = data.isAdmin;
+    setStoredEmail(normalizedEmail);
+    setAuthChoiceSeen();
+    updateAuthUI();
+    await cargarAnimes();
+    mostrarMensajeTemporal(`Sesión iniciada: ${normalizedEmail}`);
+}
+
+function logout() {
+    state.user = null;
+    state.isAdmin = false;
+    clearStoredEmail();
+    updateAuthUI();
+    cargarAnimes();
+    mostrarMensajeTemporal("Sesión cerrada");
+}
+
+function getEmailParam() {
+    return state.user?.email || "";
+}
+
+function buildQuery(params = {}) {
+    const cleanParams = Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== "");
+    if (!cleanParams.length) return "";
+    return `?${new URLSearchParams(cleanParams).toString()}`;
+}
+
+async function getAnimes(params = {}) {
+    return request(`/animes/ordenados${buildQuery(params)}`);
+}
+
+async function cargarAnimes() {
+    try {
+        const animes = await getAnimes({ email: getEmailParam() });
+        state.allAnimes = animes;
+        actualizarSecciones(animes);
+        mostrarAnimes(animes);
+    } catch (error) {
+        console.error("Error al cargar animes:", error);
+        mostrarMensajeTemporal("No se pudo cargar la lista de animes");
+    }
 }
 
 function actualizarSecciones(animes) {
     const listaVisto = document.getElementById("visto-animes");
     const listaNoVisto = document.getElementById("no-visto-animes");
+    const loginRequired = document.getElementById("login-required-visto");
 
     listaVisto.innerHTML = "";
     listaNoVisto.innerHTML = "";
 
-    animes.forEach(anime => {
+    if (!state.user || !state.user.email) {
+        loginRequired.classList.remove("oculto");
+    } else {
+        loginRequired.classList.add("oculto");
+    }
+
+    animes.forEach((anime) => {
+        const estado = anime.estado_usuario || anime.estado;
         const card = document.createElement("div");
         card.classList.add("anime-card");
         card.innerHTML = `
@@ -37,45 +163,51 @@ function actualizarSecciones(animes) {
                     <h3>${anime.nombre}</h3>
                     <p>Capítulos: ${anime.capitulos}</p>
                     <p>Año: ${anime.anio_emision}</p>
-                    <button onclick="cambiarEstado(${anime.id}, '${anime.estado}')">
-                        ${anime.estado === "NO VISTO" ? "TERMINADO" : "DESMARCAR"}
+                    <button class="estado-btn" onclick="cambiarEstado(${anime.id}, '${estado}')">
+                        ${estado === "NO VISTO" ? "TERMINADO" : "DESMARCAR"}
                     </button>
                 </div>
             </div>
         `;
 
-        if (anime.estado === "VISTO") {
-            listaVisto.appendChild(card);
+        if (estado === "VISTO") {
+            if (state.user) listaVisto.appendChild(card);
         } else {
             listaNoVisto.appendChild(card);
         }
     });
 }
 
-function cambiarEstado(id, estadoActual) {
-    console.log("Cambiando estado del anime con ID:", id, "Estado actual:", estadoActual);
+async function cambiarEstado(id, estadoActual) {
+    if (!state.user && !state.isAdmin) {
+        mostrarMensajeTemporal("Inicia sesión para guardar tu estado de visto/no visto");
+        return;
+    }
 
     const nuevoEstado = estadoActual === "VISTO" ? "NO VISTO" : "VISTO";
 
-    fetch(`https://animepage-production.up.railway.app/api/animes/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ estado: nuevoEstado })
-    })
-    .then(response => response.json())
-    .then(data => {
-        console.log("Estado cambiado con éxito:", data);
+    try {
+        await request(`/animes/${id}/estado`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ estado: nuevoEstado, email: getEmailParam() })
+        });
         mostrarMensajeTemporal(`Estado cambiado a ${nuevoEstado}`);
-        cargarAnimes(); // 🔄 Recargar la lista de animes
-    })
-    .catch(error => console.error("Error al cambiar estado:", error));
-    obtenerAnimesOrdenados();
+        await cargarAnimes();
+    } catch (error) {
+        console.error("Error al cambiar estado:", error);
+        mostrarMensajeTemporal(error.message);
+    }
 }
 
-const animeForm = document.getElementById("animeForm");
-animeForm.addEventListener("submit", function(event) {
+animeForm.addEventListener("submit", async function (event) {
     event.preventDefault();
-    
+
+    if (!state.isAdmin) {
+        mostrarMensajeTemporal("Solo admin puede agregar o actualizar animes");
+        return;
+    }
+
     const animeId = this.dataset.animeId || "";
     const animeData = {
         nombre: document.getElementById("nombre").value,
@@ -83,56 +215,55 @@ animeForm.addEventListener("submit", function(event) {
         capitulos: document.getElementById("capitulos").value,
         anio_emision: document.getElementById("anio_emision").value,
         sinopsis: document.getElementById("sinopsis").value,
-        estado: document.getElementById("estado").value
+        estado: document.getElementById("estado").value,
+        email: getEmailParam()
     };
 
-    const url = animeId ? `https://animepage-production.up.railway.app/api/animes/${animeId}` : "https://animepage-production.up.railway.app/api/animes";
+    const endpoint = animeId ? `/animes/${animeId}` : "/animes";
     const method = animeId ? "PUT" : "POST";
 
-    fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(animeData)
-    })
-    .then(response => response.json())
-    .then(data => {
-        console.log(animeId ? "Anime actualizado:" : "Anime agregado:", data);
-        mostrarMensajeTemporal(animeId ? "Anime actualizado correctamente" : "Anime agregado correctamente");
-        cargarAnimes();
+    try {
+        await request(endpoint, {
+            method,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(animeData)
+        });
+        mostrarMensajeTemporal(animeId ? "Anime actualizado" : "Anime agregado");
         limpiarFormulario();
-    })
-    .catch(error => console.error("Error al procesar anime:", error));
+        await cargarAnimes();
+    } catch (error) {
+        mostrarMensajeTemporal(error.message);
+    }
 });
 
-document.getElementById("nombre").addEventListener("keypress", function(event) {
+document.getElementById("nombre").addEventListener("keypress", function (event) {
     if (event.key === "Enter") {
         event.preventDefault();
         buscarAnimePorNombre(this.value.trim());
     }
 });
 
-function buscarAnimePorNombre(nombre) {
+async function buscarAnimePorNombre(nombre) {
     if (!nombre) return;
-    
-    fetch(`https://animepage-production.up.railway.app/api/animes?nombre=${encodeURIComponent(nombre)}`)
-        .then(response => response.json())
-        .then(data => {
-            if (!data.length) {
-                mostrarMensajeTemporal("No hay información");
-                limpiarFormulario();
-                return;
-            }
-            
-            const anime = data[0];
-            document.getElementById("imagen_url").value = anime.imagen_url || "";
-            document.getElementById("capitulos").value = anime.capitulos || "";
-            document.getElementById("anio_emision").value = anime.anio_emision || "";
-            document.getElementById("sinopsis").value = anime.sinopsis || "";
-            document.getElementById("estado").value = anime.estado || "NO VISTO";
-            animeForm.dataset.animeId = anime.id;
-            document.querySelector(".submit-btn").textContent = "Actualizar";
-        })
-        .catch(error => console.error("Error al buscar anime:", error));
+
+    try {
+        const data = await request(`/animes${buildQuery({ nombre, email: getEmailParam() })}`);
+        if (!data.length) {
+            mostrarMensajeTemporal("No hay información");
+            return;
+        }
+
+        const anime = data[0];
+        document.getElementById("imagen_url").value = anime.imagen_url || "";
+        document.getElementById("capitulos").value = anime.capitulos || "";
+        document.getElementById("anio_emision").value = anime.anio_emision || "";
+        document.getElementById("sinopsis").value = anime.sinopsis || "";
+        document.getElementById("estado").value = anime.estado || "NO VISTO";
+        animeForm.dataset.animeId = anime.id;
+        document.querySelector(".submit-btn").textContent = "Actualizar";
+    } catch (error) {
+        mostrarMensajeTemporal(error.message);
+    }
 }
 
 function mostrarMensajeTemporal(mensaje) {
@@ -145,7 +276,7 @@ function mostrarMensajeTemporal(mensaje) {
     setTimeout(() => {
         mensajeDiv.classList.remove("mostrar");
         setTimeout(() => mensajeDiv.remove(), 500);
-    }, 3000);
+    }, 2600);
 }
 
 function limpiarFormulario() {
@@ -154,17 +285,10 @@ function limpiarFormulario() {
     document.querySelector(".submit-btn").textContent = "Agregar Anime";
 }
 
-let todosLosAnimes = [];
-
-async function obtenerAnimesOrdenados() {
+async function mostrarAnimesOrdenados() {
     try {
-        console.log("📢 Enviando solicitud a la API...");
-        let response = await fetch("https://animepage-production.up.railway.app/api/animes/ordenados");
-        console.log("✅ Respuesta recibida:", response);
-
-        let animes = await response.json();
-        console.log("📄 Datos obtenidos:", animes);
-        todosLosAnimes = animes;
+        const animes = await getAnimes({ email: getEmailParam() });
+        state.allAnimes = animes;
         mostrarAnimes(animes);
     } catch (error) {
         console.error("❌ Error al obtener animes:", error);
@@ -175,39 +299,39 @@ function mostrarAnimes(animes) {
     const contenedor = document.getElementById("abecedario-animes");
     contenedor.innerHTML = "";
 
-    animes.forEach(anime => {
-        let animeDiv = document.createElement("div");
+    animes.forEach((anime) => {
+        const estado = anime.estado_usuario || anime.estado;
+
+        const animeDiv = document.createElement("div");
         animeDiv.classList.add("anime-lista");
 
-        let imagen = document.createElement("img");
+        const imagen = document.createElement("img");
         imagen.src = anime.imagen_url;
         imagen.alt = anime.nombre;
-        imagen.sin = anime.sinopsis;
         imagen.classList.add("anime-imagen");
 
-        if (anime.estado === "VISTO") {
+        if (estado === "VISTO") {
             imagen.style.filter = "blur(2px) brightness(0.7)";
         }
 
-        let nombre = document.createElement("span");
+        const nombre = document.createElement("span");
         nombre.textContent = anime.nombre;
         nombre.classList.add("anime-nombre");
 
-        // ✅ NUEVO: agregar sinopsis si existe
-        let sinopsis = document.createElement("p");
+        const sinopsis = document.createElement("p");
         sinopsis.classList.add("anime-sinopsis");
-        sinopsis.textContent = anime.sinopsis || ""; // evita mostrar "undefined"
+        sinopsis.textContent = anime.sinopsis || "";
 
         animeDiv.appendChild(imagen);
         animeDiv.appendChild(nombre);
-        animeDiv.appendChild(sinopsis); // añadimos la sinopsis
+        animeDiv.appendChild(sinopsis);
         contenedor.appendChild(animeDiv);
     });
 }
 
 function desplazarALetra(letra) {
-    let animes = document.querySelectorAll(".anime-lista");
-    for (let anime of animes) {
+    const animes = document.querySelectorAll(".anime-lista");
+    for (const anime of animes) {
         if (anime.textContent.trim().toUpperCase().startsWith(letra.toUpperCase())) {
             anime.scrollIntoView({ behavior: "smooth", block: "start" });
             break;
@@ -217,10 +341,11 @@ function desplazarALetra(letra) {
 
 function generarAbecedario() {
     const letras = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    const contenedor = document.querySelector(".letras-navbar"); // Cambiado de letras-sidebar
+    const contenedor = document.querySelector(".letras-navbar");
+    contenedor.innerHTML = "";
 
-    letras.split("").forEach(letra => {
-        let boton = document.createElement("button");
+    letras.split("").forEach((letra) => {
+        const boton = document.createElement("button");
         boton.textContent = letra;
         boton.classList.add("letra-boton");
         boton.addEventListener("click", () => desplazarALetra(letra));
@@ -228,90 +353,48 @@ function generarAbecedario() {
     });
 }
 
-// Inicialización al cargar
-document.addEventListener("DOMContentLoaded", () => {
-    obtenerAnimesOrdenados();
-    generarAbecedario();
-});
-
-document.addEventListener("DOMContentLoaded", function () {
-    // Vincular el botón de girar con la función
-    document.getElementById("girarRuleta").addEventListener("click", girarRuleta);
-});
-
-function mostrarSeccion(seccionId) {
-    // Ocultar todas las secciones
-    let secciones = document.querySelectorAll(".seccion");
-    secciones.forEach(seccion => {
-        seccion.style.display = "none";
-    });
-
-    // Mostrar solo la sección seleccionada
-    let seccionActiva = document.getElementById(seccionId);
-    if (seccionActiva) {
-        seccionActiva.style.display = "block";
-
-        // Si la sección es la ruleta, generamos los colores aleatorios
-        if (seccionId === "seccion-ruleta") {
-            actualizarRuleta();
-        }
-    }
-}
-
 function generarColoresAleatorios() {
-    let colores = [];
+    const colores = [];
     for (let i = 0; i < 10; i++) {
-        let color = `hsl(${Math.random() * 360}, 100%, 50%)`; // Colores vibrantes
-        colores.push(color);
+        colores.push(`hsl(${Math.random() * 360}, 100%, 50%)`);
     }
     return colores;
 }
 
 function actualizarRuleta() {
-    let ruleta = document.getElementById("ruleta-box");
-    let colores = generarColoresAleatorios();
-
-    // Crear el gradiente cónico con los colores aleatorios
-    let gradiente = `conic-gradient(
-        ${colores[0]} 0% 10%, ${colores[1]} 10% 20%, 
-        ${colores[2]} 20% 30%, ${colores[3]} 30% 40%, 
-        ${colores[4]} 40% 50%, ${colores[5]} 50% 60%, 
-        ${colores[6]} 60% 70%, ${colores[7]} 70% 80%, 
+    const ruleta = document.getElementById("ruleta-box");
+    const colores = generarColoresAleatorios();
+    ruleta.style.background = `conic-gradient(
+        ${colores[0]} 0% 10%, ${colores[1]} 10% 20%,
+        ${colores[2]} 20% 30%, ${colores[3]} 30% 40%,
+        ${colores[4]} 40% 50%, ${colores[5]} 50% 60%,
+        ${colores[6]} 60% 70%, ${colores[7]} 70% 80%,
         ${colores[8]} 80% 90%, ${colores[9]} 90% 100%
     )`;
-
-    ruleta.style.background = gradiente;
 }
 
 async function girarRuleta() {
-    actualizarRuleta(); // Cambiar colores antes de girar
+    actualizarRuleta();
 
-    let ruleta = document.getElementById("ruleta-box");
-    let giros = Math.floor(Math.random() * 5) + 5; // Entre 5 y 9 vueltas completas
-    let anguloFinal = giros * 360 + Math.floor(Math.random() * 360); // Giro aleatorio
+    const ruleta = document.getElementById("ruleta-box");
+    const giros = Math.floor(Math.random() * 5) + 5;
+    const anguloFinal = giros * 360 + Math.floor(Math.random() * 360);
 
     ruleta.style.transition = "transform 3s ease-out";
     ruleta.style.transform = `rotate(${anguloFinal}deg)`;
 
-    // Esperar a que termine la animación
     setTimeout(async () => {
-        let animeElegido = await obtenerAnimeAleatorio();
-        if (animeElegido) {
-            mostrarAnimeSeleccionado(animeElegido);
-        }
+        const animeElegido = await obtenerAnimeAleatorio();
+        if (animeElegido) mostrarAnimeSeleccionado(animeElegido);
     }, 3100);
 }
 
 async function obtenerAnimeAleatorio() {
     try {
-        let response = await fetch("https://animepage-production.up.railway.app/api/animes/no-visto");
-        let animes = await response.json();
+        const animes = await request(`/animes/no-visto${buildQuery({ email: getEmailParam() })}`);
+        if (!animes.length) return null;
 
-        if (animes.length === 0) {
-            return null;
-        }
-
-        let indiceAleatorio = Math.floor(Math.random() * animes.length);
+        const indiceAleatorio = Math.floor(Math.random() * animes.length);
         return animes[indiceAleatorio];
     } catch (error) {
         console.error("❌ Error al obtener animes:", error);
@@ -320,7 +403,7 @@ async function obtenerAnimeAleatorio() {
 }
 
 function mostrarAnimeSeleccionado(anime) {
-    let resultadoDiv = document.getElementById("resultado-ruleta");
+    const resultadoDiv = document.getElementById("resultado-ruleta");
     resultadoDiv.innerHTML = `
         <h3>${anime.nombre}</h3>
         <img src="${anime.imagen_url}" alt="${anime.nombre}" class="anime-imagen-seleccionado">
@@ -330,77 +413,124 @@ function mostrarAnimeSeleccionado(anime) {
     resultadoDiv.style.display = "block";
 }
 
-// Suponiendo que tienes los datos del anime en un objeto
 function mostrarModal(anime) {
+    const estado = anime.estado_usuario || anime.estado;
     document.getElementById("modal-imagen").src = anime.imagen_url;
     document.getElementById("modal-nombre").textContent = anime.nombre;
     document.getElementById("modal-anio").textContent = anime.anio_emision || "Desconocido";
     document.getElementById("modal-capitulos").textContent = anime.capitulos || "??";
     document.getElementById("modal-sinopsis").textContent = anime.sinopsis || "Sin sinopsis disponible";
-    document.getElementById("modal-estado").textContent = anime.estado;
+    document.getElementById("modal-estado").textContent = estado;
 
-    // Mostrar modal
     document.getElementById("anime-modal").classList.remove("oculto");
-
-    // Cerrar modal
     document.querySelector(".cerrar-modal").onclick = () => {
         document.getElementById("anime-modal").classList.add("oculto");
     };
 
-    // Agregar evento al botón cambiar estado
     const btnEstado = document.getElementById("modal-estado-btn");
-    btnEstado.onclick = () => {
-        cambiarEstado(anime.id, anime.estado);
-    };
+    btnEstado.onclick = () => cambiarEstado(anime.id, estado);
 }
 
-/*Document que permite la busqueda*/
 document.getElementById("buscador-anime").addEventListener("input", function () {
     const termino = this.value.toLowerCase();
     const resultados = document.getElementById("resultados-buscador");
-
     resultados.innerHTML = "";
 
-    if (termino === "") {
+    if (!termino) {
         resultados.style.display = "none";
         return;
     }
 
-    const coincidencias = todosLosAnimes.filter(anime => anime.nombre.toLowerCase().includes(termino));
+    const coincidencias = state.allAnimes.filter((anime) =>
+        anime.nombre.toLowerCase().includes(termino)
+    );
 
-    if (coincidencias.length > 0) {
-        coincidencias.slice(0, 5).forEach(anime => {
-            const li = document.createElement("li");
-
-            const img = document.createElement("img");
-            img.src = anime.imagen_url;
-            img.alt = anime.nombre;
-
-            const nombre = document.createElement("span");
-            nombre.textContent = anime.nombre;
-
-            li.appendChild(img);
-            li.appendChild(nombre);
-
-            li.addEventListener("click", () => {
-                document.getElementById("buscador-anime").value = anime.nombre;
-                resultados.style.display = "none";
-
-                mostrarModal(anime); // <<-- Aquí llamamos la función que muestra el modal
-            });
-
-
-            resultados.appendChild(li);
-        });
-
-        resultados.style.display = "block";
-    } else {
+    if (!coincidencias.length) {
         resultados.style.display = "none";
+        return;
     }
+
+    coincidencias.slice(0, 5).forEach((anime) => {
+        const li = document.createElement("li");
+        li.innerHTML = `<img src="${anime.imagen_url}" alt="${anime.nombre}"><span>${anime.nombre}</span>`;
+        li.addEventListener("click", () => {
+            document.getElementById("buscador-anime").value = anime.nombre;
+            resultados.style.display = "none";
+            mostrarModal(anime);
+        });
+        resultados.appendChild(li);
+    });
+
+    resultados.style.display = "block";
 });
 
 document.addEventListener("click", function (e) {
     if (!e.target.closest(".buscador-container")) {
         document.getElementById("resultados-buscador").style.display = "none";
     }
+});
+
+window.mostrarSeccion = mostrarSeccion;
+window.cambiarEstado = cambiarEstado;
+
+document.getElementById("email-input").addEventListener("keydown", async (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+
+    const email = event.target.value.trim();
+    if (!email) return;
+
+    try {
+        await login(email);
+    } catch (error) {
+        mostrarMensajeTemporal(error.message);
+    }
+});
+
+document.addEventListener("DOMContentLoaded", async () => {
+    mostrarSeccion("inicio");
+    generarAbecedario();
+
+    document.getElementById("girarRuleta").addEventListener("click", girarRuleta);
+    document.getElementById("login-btn").addEventListener("click", async () => {
+        const email = document.getElementById("email-input").value.trim();
+        if (!email) {
+            mostrarMensajeTemporal("Escribe tu correo para iniciar sesión");
+            return;
+        }
+
+        try {
+            await login(email);
+        } catch (error) {
+            mostrarMensajeTemporal(error.message);
+        }
+    });
+
+    document.getElementById("logout-btn").addEventListener("click", logout);
+    document.getElementById("choice-login").addEventListener("click", () => {
+        document.getElementById("auth-choice").classList.add("oculto");
+        document.getElementById("email-input").focus();
+        setAuthChoiceSeen();
+    });
+    document.getElementById("choice-guest").addEventListener("click", () => {
+        document.getElementById("auth-choice").classList.add("oculto");
+        setAuthChoiceSeen();
+        updateAuthUI();
+    });
+
+    const savedEmail = getStoredEmail();
+    if (savedEmail) {
+        try {
+            await login(savedEmail);
+            return;
+        } catch (error) {
+            clearStoredEmail();
+        }
+    }
+
+    updateAuthUI();
+    if (!hasSeenAuthChoice()) {
+        document.getElementById("auth-choice").classList.remove("oculto");
+    }
+    await cargarAnimes();
 });
