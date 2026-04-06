@@ -52,13 +52,6 @@ app.get('*', (req, res) => {
 
 // Iniciar servidor
 const PORT = process.env.PORT || 4000;
-pool.query('SELECT 1')
-    .then(() => {
-        app.listen(PORT, () => {
-            console.log(`✅ Servidor corriendo en el puerto ${PORT}`);
-        });
-    })
-    .catch((error) => {
-        console.error('❌ No se pudo conectar a MySQL al iniciar:', error.message);
-        process.exit(1);
-    });
+app.listen(PORT, () => {
+    console.log(`Servidor corriendo en el puerto ${PORT}`);
+});
