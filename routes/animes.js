@@ -3,6 +3,7 @@ const router = express.Router();
 
 module.exports = (pool) => {
     const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+    const ESTADOS_VALIDOS = new Set(['VISTO', 'NO VISTO']);
 
     const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
 
@@ -21,6 +22,8 @@ module.exports = (pool) => {
             isAdmin: normalizedEmail === ADMIN_EMAIL
         };
     };
+
+    const isEstadoValido = (estado) => ESTADOS_VALIDOS.has(String(estado || '').toUpperCase());
 
     const ensureTables = async () => {
         await pool.query(`
@@ -76,6 +79,31 @@ module.exports = (pool) => {
 
         try {
             const requester = await resolveRequester(email);
+            let query = '';
+            const params = [];
+
+            if (requester.isAdmin) {
+                query = `
+                    SELECT a.*, a.estado AS estado_usuario
+                    FROM animes a
+                `;
+            } else if (requester.user) {
+                query = `
+                    SELECT a.*, COALESCE(ua.estado, 'NO VISTO') AS estado_usuario
+                    FROM animes a
+                    LEFT JOIN user_anime_estado ua ON ua.anime_id = a.id AND ua.user_id = ?
+                `;
+                params.push(requester.user.id);
+            } else {
+                query = `
+                    SELECT a.*, 'NO VISTO' AS estado_usuario
+                    FROM animes a
+                `;
+            }
+
+            if (nombre) {
+                query += ' WHERE a.nombre LIKE ?';
+                params.push(`%${nombre}%`);
 
             let query = `
                 SELECT a.*, COALESCE(ua.estado, a.estado) AS estado_usuario
@@ -107,6 +135,26 @@ module.exports = (pool) => {
         const email = req.query.email;
         try {
             const requester = await resolveRequester(email);
+            let query = '';
+            const params = [];
+
+            if (requester.isAdmin) {
+                query = `
+                    SELECT a.*, a.estado AS estado_usuario
+                    FROM animes a
+                `;
+            } else if (requester.user) {
+                query = `
+                    SELECT a.*, COALESCE(ua.estado, 'NO VISTO') AS estado_usuario
+                    FROM animes a
+                    LEFT JOIN user_anime_estado ua ON ua.anime_id = a.id AND ua.user_id = ?
+                `;
+                params.push(requester.user.id);
+            } else {
+                query = `
+                    SELECT a.*, 'NO VISTO' AS estado_usuario
+                    FROM animes a
+                `;
             let query = `
                 SELECT a.*, COALESCE(ua.estado, a.estado) AS estado_usuario
                 FROM animes a
@@ -133,6 +181,28 @@ module.exports = (pool) => {
         const email = req.query.email;
         try {
             const requester = await resolveRequester(email);
+            let query = '';
+            const params = [];
+
+            if (requester.isAdmin) {
+                query = `
+                    SELECT a.*, a.estado AS estado_usuario
+                    FROM animes a
+                    WHERE a.estado = 'NO VISTO'
+                `;
+            } else if (requester.user) {
+                query = `
+                    SELECT a.*, COALESCE(ua.estado, 'NO VISTO') AS estado_usuario
+                    FROM animes a
+                    LEFT JOIN user_anime_estado ua ON ua.anime_id = a.id AND ua.user_id = ?
+                    WHERE COALESCE(ua.estado, 'NO VISTO') = 'NO VISTO'
+                `;
+                params.push(requester.user.id);
+            } else {
+                query = `
+                    SELECT a.*, 'NO VISTO' AS estado_usuario
+                    FROM animes a
+                `;
             let query = `
                 SELECT a.*, COALESCE(ua.estado, a.estado) AS estado_usuario
                 FROM animes a
@@ -165,6 +235,9 @@ module.exports = (pool) => {
 
         if (!nombre || !imagen_url || !capitulos || !anio_emision || !sinopsis || !estado) {
             return res.status(400).json({ error: 'Todos los campos son obligatorios' });
+        }
+        if (!isEstadoValido(estado)) {
+            return res.status(400).json({ error: 'Estado inválido. Usa VISTO o NO VISTO' });
         }
 
         try {
@@ -205,6 +278,9 @@ module.exports = (pool) => {
 
         if (!estado) {
             return res.status(400).json({ error: 'El estado es obligatorio' });
+        }
+        if (!isEstadoValido(estado)) {
+            return res.status(400).json({ error: 'Estado inválido. Usa VISTO o NO VISTO' });
         }
 
         try {
@@ -258,6 +334,9 @@ module.exports = (pool) => {
             anio_emision = anio_emision ?? animeActual.anio_emision;
             sinopsis = sinopsis ?? animeActual.sinopsis;
             estado = estado ?? animeActual.estado;
+            if (!isEstadoValido(estado)) {
+                return res.status(400).json({ error: 'Estado inválido. Usa VISTO o NO VISTO' });
+            }
 
             await pool.query(
                 'UPDATE animes SET nombre = ?, imagen_url = ?, capitulos = ?, anio_emision = ?, sinopsis = ?, estado = ? WHERE id = ?',

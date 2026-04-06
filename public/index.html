@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="api-base" content="https://animepage-production.up.railway.app/api">
     <title>Anime Página</title>
     <link rel="icon" type="image/png" href="Logo.webp">
     <link rel="stylesheet" href="styles.css">
@@ -20,10 +21,21 @@
         </div>
         <div id="auth-panel" class="auth-panel">
             <span id="auth-status">Modo invitado</span>
+            <div class="auth-login-group">
+                <input type="email" id="email-input" placeholder="correo@ejemplo.com">
+                <button id="login-btn" class="auth-btn">Iniciar sesión</button>
+            </div>
             <button id="login-btn" class="auth-btn">Iniciar sesión</button>
             <button id="logout-btn" class="auth-btn oculto">Cerrar sesión</button>
         </div>
     </header>
+    <div id="auth-choice" class="auth-choice oculto">
+        <p>¿Deseas iniciar sesión para guardar tu progreso visto/no-visto?</p>
+        <div class="auth-choice-actions">
+            <button id="choice-login" class="auth-btn">Sí, iniciar sesión</button>
+            <button id="choice-guest" class="auth-btn secondary">Continuar como invitado</button>
+        </div>
+    </div>
 
     <div id="inicio" class="seccion">
         <div class="form-container" id="admin-form-container">

@@ -566,3 +566,8 @@ header {
 #auth-status { font-size:12px; color:#ddd; }
 .info-msg { margin: 20px auto; max-width: 700px; color: #ffd166; }
 .oculto { display:none !important; }
+.auth-login-group { display: flex; gap: 6px; align-items: center; }
+#email-input { padding: 6px 8px; border-radius: 6px; border: 1px solid #888; min-width: 190px; }
+.auth-choice { background: #252525; color: #fff; padding: 10px; border-bottom: 1px solid #3b3b3b; }
+.auth-choice-actions { display: flex; gap: 8px; justify-content: center; margin-top: 8px; }
+.auth-btn.secondary { background: #555; }
