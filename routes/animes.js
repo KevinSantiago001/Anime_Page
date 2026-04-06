@@ -104,6 +104,23 @@ module.exports = (pool) => {
             if (nombre) {
                 query += ' WHERE a.nombre LIKE ?';
                 params.push(`%${nombre}%`);
+
+            let query = `
+                SELECT a.*, COALESCE(ua.estado, a.estado) AS estado_usuario
+                FROM animes a
+            `;
+            const params = [];
+
+            if (requester.user && !requester.isAdmin) {
+                query += ' LEFT JOIN user_anime_estado ua ON ua.anime_id = a.id AND ua.user_id = ? ';
+                params.push(requester.user.id);
+            } else {
+                query += ' LEFT JOIN user_anime_estado ua ON 1 = 0 ';
+            }
+
+            if (nombre) {
+                query += ' WHERE a.nombre = ?';
+                params.push(nombre);
             }
 
             const [results] = await pool.query(query, params);
@@ -138,6 +155,17 @@ module.exports = (pool) => {
                     SELECT a.*, 'NO VISTO' AS estado_usuario
                     FROM animes a
                 `;
+            let query = `
+                SELECT a.*, COALESCE(ua.estado, a.estado) AS estado_usuario
+                FROM animes a
+            `;
+            const params = [];
+
+            if (requester.user && !requester.isAdmin) {
+                query += ' LEFT JOIN user_anime_estado ua ON ua.anime_id = a.id AND ua.user_id = ? ';
+                params.push(requester.user.id);
+            } else {
+                query += ' LEFT JOIN user_anime_estado ua ON 1 = 0 ';
             }
 
             query += ' ORDER BY a.nombre ASC';
@@ -175,6 +203,18 @@ module.exports = (pool) => {
                     SELECT a.*, 'NO VISTO' AS estado_usuario
                     FROM animes a
                 `;
+            let query = `
+                SELECT a.*, COALESCE(ua.estado, a.estado) AS estado_usuario
+                FROM animes a
+            `;
+            const params = [];
+
+            if (requester.user && !requester.isAdmin) {
+                query += ' LEFT JOIN user_anime_estado ua ON ua.anime_id = a.id AND ua.user_id = ? ';
+                params.push(requester.user.id);
+                query += " WHERE COALESCE(ua.estado, 'NO VISTO') = 'NO VISTO'";
+            } else {
+                query += " LEFT JOIN user_anime_estado ua ON 1 = 0 WHERE a.estado = 'NO VISTO'";
             }
 
             const [results] = await pool.query(query, params);

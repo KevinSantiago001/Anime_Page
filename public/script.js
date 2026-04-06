@@ -3,6 +3,8 @@ const API_BASE = configuredApiBase
     || (window.location.hostname === "localhost"
         ? "http://localhost:4000/api"
         : `${window.location.origin}/api`);
+const API_BASE = "https://animepage-production.up.railway.app/api";
+const ADMIN_EMAIL = ""; // opcional: define tu correo admin aquí si no usas ADMIN_EMAIL en Railway
 
 const state = {
     user: null,
@@ -20,6 +22,13 @@ const setAuthChoiceSeen = () => localStorage.setItem("auth_choice_seen", "1");
 const normalizeEmail = (email) => String(email || "").trim().toLowerCase();
 const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(email));
 
+async function request(path, options = {}) {
+    const response = await fetch(`${API_BASE}${path}`, options);
+    const contentType = response.headers.get("content-type") || "";
+    const data = contentType.includes("application/json")
+        ? await response.json()
+        : { error: await response.text() };
+
 const buildUrl = (path, params = {}) => {
     const url = new URL(`${API_BASE}${path}`);
     Object.entries(params).forEach(([key, value]) => {
@@ -30,10 +39,7 @@ const buildUrl = (path, params = {}) => {
 
 async function request(path, options = {}) {
     const response = await fetch(`${API_BASE}${path}`, options);
-    const contentType = response.headers.get("content-type") || "";
-    const data = contentType.includes("application/json")
-        ? await response.json()
-        : { error: await response.text() };
+    const data = await response.json();
     if (!response.ok) {
         throw new Error(data.error || data.message || "Error en la solicitud");
     }
@@ -122,8 +128,81 @@ function getEmailParam() {
     return state.user?.email || "";
 }
 
+function buildQuery(params = {}) {
+    const cleanParams = Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== "");
+    if (!cleanParams.length) return "";
+    return `?${new URLSearchParams(cleanParams).toString()}`;
+}
+
+async function getAnimes(params = {}) {
+    return request(`/animes/ordenados${buildQuery(params)}`);
+}
+
+function updateAuthUI() {
+    const authStatus = document.getElementById("auth-status");
+    const loginBtn = document.getElementById("login-btn");
+    const logoutBtn = document.getElementById("logout-btn");
+    const adminFormContainer = document.getElementById("admin-form-container");
+    const guestAdminMsg = document.getElementById("guest-admin-msg");
+
+    if (state.user) {
+        authStatus.textContent = state.isAdmin
+            ? `Admin: ${state.user.email}`
+            : `Usuario: ${state.user.email}`;
+        loginBtn.classList.add("oculto");
+        logoutBtn.classList.remove("oculto");
+    } else {
+        authStatus.textContent = "Modo invitado";
+        loginBtn.classList.remove("oculto");
+        logoutBtn.classList.add("oculto");
+    }
+
+    if (state.isAdmin) {
+        adminFormContainer.classList.remove("oculto");
+        guestAdminMsg.classList.add("oculto");
+    } else {
+        adminFormContainer.classList.add("oculto");
+        guestAdminMsg.classList.remove("oculto");
+    }
+}
+
+async function login(email) {
+    const data = await request("/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+    });
+
+    state.user = data.user;
+    state.isAdmin = data.isAdmin || (ADMIN_EMAIL && email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
+    setStoredEmail(email.toLowerCase());
+    updateAuthUI();
+    await cargarAnimes();
+    mostrarMensajeTemporal(`Sesión iniciada: ${email}`);
+}
+
+function logout() {
+    state.user = null;
+    state.isAdmin = false;
+    clearStoredEmail();
+    updateAuthUI();
+    cargarAnimes();
+    mostrarMensajeTemporal("Sesión cerrada");
+}
+
+function getEmailParam() {
+    return state.user?.email || "";
+}
+
 async function cargarAnimes() {
     try {
+        const animes = await getAnimes({ email: getEmailParam() });
+        state.allAnimes = animes;
+        actualizarSecciones(animes);
+        mostrarAnimes(animes);
+    } catch (error) {
+        console.error("Error al cargar animes:", error);
+        mostrarMensajeTemporal("No se pudo cargar la lista de animes");
         const email = getEmailParam();
         const animes = await (await fetch(buildUrl("/animes", { email }))).json();
         state.allAnimes = animes;
@@ -244,6 +323,8 @@ document.getElementById("nombre").addEventListener("keypress", function (event) 
 async function buscarAnimePorNombre(nombre) {
     if (!nombre) return;
 
+    try {
+        const data = await request(`/animes${buildQuery({ nombre, email: getEmailParam() })}`);
     const url = buildUrl("/animes", { nombre, email: getEmailParam() });
 
     try {
@@ -287,6 +368,7 @@ function limpiarFormulario() {
 
 async function mostrarAnimesOrdenados() {
     try {
+        const animes = await getAnimes({ email: getEmailParam() });
         const email = getEmailParam();
         const animes = await (await fetch(buildUrl("/animes/ordenados", { email }))).json();
         state.allAnimes = animes;
@@ -392,6 +474,7 @@ async function girarRuleta() {
 
 async function obtenerAnimeAleatorio() {
     try {
+        const animes = await request(`/animes/no-visto${buildQuery({ email: getEmailParam() })}`);
         const email = getEmailParam();
         const response = await fetch(buildUrl("/animes/no-visto", { email }));
         const animes = await response.json();
@@ -487,7 +570,19 @@ document.getElementById("email-input").addEventListener("keydown", async (event)
         await login(email);
     } catch (error) {
         mostrarMensajeTemporal(error.message);
-    }
+
+    coincidencias.slice(0, 5).forEach((anime) => {
+        const li = document.createElement("li");
+        li.innerHTML = `<img src="${anime.imagen_url}" alt="${anime.nombre}"><span>${anime.nombre}</span>`;
+        li.addEventListener("click", () => {
+            document.getElementById("buscador-anime").value = anime.nombre;
+            resultados.style.display = "none";
+            mostrarModal(anime);
+        });
+        resultados.appendChild(li);
+    });
+
+    resultados.style.display = "block";
 });
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -535,5 +630,98 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (!hasSeenAuthChoice()) {
         document.getElementById("auth-choice").classList.remove("oculto");
     }
+    await cargarAnimes();
+});
+
+window.mostrarSeccion = mostrarSeccion;
+window.cambiarEstado = cambiarEstado;
+
+document.addEventListener("DOMContentLoaded", async () => {
+    mostrarSeccion("inicio");
+    generarAbecedario();
+
+    document.getElementById("girarRuleta").addEventListener("click", girarRuleta);
+    document.getElementById("login-btn").addEventListener("click", async () => {
+        const email = prompt("Ingresa tu correo para iniciar sesión:");
+        if (!email) return;
+
+        try {
+            await login(email);
+        } catch (error) {
+            mostrarMensajeTemporal(error.message);
+        }
+    });
+
+    document.getElementById("logout-btn").addEventListener("click", logout);
+
+    const savedEmail = getStoredEmail();
+    if (savedEmail) {
+        try {
+            await login(savedEmail);
+            return;
+        } catch (error) {
+            clearStoredEmail();
+        }
+    }
+
+document.addEventListener("DOMContentLoaded", async () => {
+    mostrarSeccion("inicio");
+    generarAbecedario();
+
+    document.getElementById("girarRuleta").addEventListener("click", girarRuleta);
+    document.getElementById("login-btn").addEventListener("click", async () => {
+        const email = document.getElementById("email-input").value.trim();
+        if (!email) {
+            mostrarMensajeTemporal("Escribe tu correo para iniciar sesión");
+            return;
+        }
+
+        try {
+            await login(email);
+        } catch (error) {
+            mostrarMensajeTemporal(error.message);
+        }
+    });
+
+    document.getElementById("logout-btn").addEventListener("click", logout);
+    document.getElementById("choice-login").addEventListener("click", () => {
+        document.getElementById("auth-choice").classList.add("oculto");
+        document.getElementById("email-input").focus();
+        setAuthChoiceSeen();
+    });
+    document.getElementById("choice-guest").addEventListener("click", () => {
+        document.getElementById("auth-choice").classList.add("oculto");
+        setAuthChoiceSeen();
+        updateAuthUI();
+    });
+
+    const savedEmail = getStoredEmail();
+    if (savedEmail) {
+        try {
+            await login(savedEmail);
+            return;
+        } catch (error) {
+            clearStoredEmail();
+        }
+    }
+
+    updateAuthUI();
+    if (!hasSeenAuthChoice()) {
+        document.getElementById("auth-choice").classList.remove("oculto");
+    }
+    const wantsLogin = confirm("¿Deseas iniciar sesión para guardar tu progreso de animes vistos?");
+    if (wantsLogin) {
+        const email = prompt("Ingresa tu correo electrónico:");
+        if (email) {
+            try {
+                await login(email);
+                return;
+            } catch (error) {
+                mostrarMensajeTemporal(error.message);
+            }
+        }
+    }
+
+    updateAuthUI();
     await cargarAnimes();
 });
