@@ -488,6 +488,12 @@ document.getElementById("email-input").addEventListener("keydown", async (event)
     } catch (error) {
         mostrarMensajeTemporal(error.message);
     }
+
+    updateAuthUI();
+    if (!hasSeenAuthChoice()) {
+        document.getElementById("auth-choice").classList.remove("oculto");
+    }
+    await cargarAnimes();
 });
 
 document.addEventListener("DOMContentLoaded", async () => {
