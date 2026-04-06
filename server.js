@@ -2,10 +2,19 @@ require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');  // 👈 Usamos mysql2 con `promise`
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
 app.use(express.json());
 app.use(cors());
+
+const REQUIRED_ENV_VARS = ['MYSQLHOST', 'MYSQLUSER', 'MYSQLPASSWORD', 'MYSQLDATABASE', 'MYSQLPORT'];
+const missingVars = REQUIRED_ENV_VARS.filter((key) => !process.env[key]);
+
+if (missingVars.length) {
+    console.error(`❌ Faltan variables de entorno obligatorias: ${missingVars.join(', ')}`);
+    process.exit(1);
+}
 
 // Configurar conexión a MySQL con pool de conexiones
 const pool = mysql.createPool({
@@ -23,8 +32,14 @@ const pool = mysql.createPool({
 const animeRoutes = require('./routes/animes')(pool);
 app.use('/api', animeRoutes);
 
-// Ruta de prueba
-const path = require('path');
+app.get('/health', async (_, res) => {
+    try {
+        await pool.query('SELECT 1');
+        res.json({ ok: true, db: 'connected' });
+    } catch (error) {
+        res.status(500).json({ ok: false, db: 'disconnected', error: error.message });
+    }
+});
 
 // Servir archivos estáticos desde /public
 app.use(express.static(path.join(__dirname, 'public')));
@@ -36,8 +51,14 @@ app.get('*', (req, res) => {
 
 
 // Iniciar servidor
-const PORT = 4000;
-app.listen(PORT, () => {
-    console.log(`Servidor corriendo en el puerto ${PORT}`);
-});
-
+const PORT = process.env.PORT || 4000;
+pool.query('SELECT 1')
+    .then(() => {
+        app.listen(PORT, () => {
+            console.log(`✅ Servidor corriendo en el puerto ${PORT}`);
+        });
+    })
+    .catch((error) => {
+        console.error('❌ No se pudo conectar a MySQL al iniciar:', error.message);
+        process.exit(1);
+    });
