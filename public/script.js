@@ -338,17 +338,12 @@ function generarAbecedario() {
     });
 }
 
-function generarColoresAleatorios() {
-    const colores = [];
-    for (let i = 0; i < 10; i++) {
-        colores.push(`hsl(${Math.random() * 360}, 100%, 50%)`);
-    }
-    return colores;
-}
-
 function actualizarRuleta() {
     const ruleta = document.getElementById("ruleta-box");
-    const colores = generarColoresAleatorios();
+    const colores = [
+        "#2b18ff", "#15d4ff", "#2dff8a", "#95ff1a", "#ffe100",
+        "#ff7a00", "#ff2d95", "#b22dff", "#00ffd5", "#0e63ff"
+    ];
     ruleta.style.background = `conic-gradient(
         ${colores[0]} 0% 10%, ${colores[1]} 10% 20%,
         ${colores[2]} 20% 30%, ${colores[3]} 30% 40%,
@@ -370,7 +365,11 @@ async function girarRuleta() {
 
     setTimeout(async () => {
         const animeElegido = await obtenerAnimeAleatorio();
-        if (animeElegido) mostrarAnimeSeleccionado(animeElegido);
+        if (animeElegido) {
+            mostrarAnimeSeleccionado(animeElegido);
+        } else {
+            mostrarMensajeTemporal("No hay animes NO VISTO disponibles para recomendar.");
+        }
     }, 3100);
 }
 
@@ -379,10 +378,14 @@ async function obtenerAnimeAleatorio() {
         const email = getEmailParam();
         const response = await fetch(buildUrl("/animes/no-visto", { email }));
         const animes = await response.json();
-        if (!animes.length) return null;
+        const noVistos = animes.filter((anime) => {
+            const estado = anime.estado_usuario || anime.estado;
+            return estado === "NO VISTO";
+        });
+        if (!noVistos.length) return null;
 
-        const indiceAleatorio = Math.floor(Math.random() * animes.length);
-        return animes[indiceAleatorio];
+        const indiceAleatorio = Math.floor(Math.random() * noVistos.length);
+        return noVistos[indiceAleatorio];
     } catch (error) {
         console.error("❌ Error al obtener animes:", error);
         return null;
@@ -390,14 +393,22 @@ async function obtenerAnimeAleatorio() {
 }
 
 function mostrarAnimeSeleccionado(anime) {
+    const score = document.getElementById("ruleta-anime-score");
+    const imagen = document.getElementById("ruleta-anime-imagen");
+    const nombre = document.getElementById("ruleta-anime-nombre");
     const resultadoDiv = document.getElementById("resultado-ruleta");
+    const card = document.getElementById("ruleta-anime-card");
+
+    score.textContent = anime.anio_emision || "----";
+    imagen.src = anime.imagen_url;
+    imagen.alt = anime.nombre;
+    nombre.textContent = anime.nombre;
+    card.classList.add("activo");
+    
     resultadoDiv.innerHTML = `
-        <h3>${anime.nombre}</h3>
-        <img src="${anime.imagen_url}" alt="${anime.nombre}" class="anime-imagen-seleccionado">
-        <h3>${anime.capitulos}</h3>
-        <p class="anime-sinopsis">${anime.sinopsis || ""}</p>
+        <p><strong>${anime.nombre}</strong> tiene ${anime.capitulos || "?"} capítulos.</p>
+        <p>${anime.sinopsis || "Sin sinopsis disponible."}</p>
     `;
-    resultadoDiv.style.display = "block";
 }
 
 function mostrarModal(anime) {
