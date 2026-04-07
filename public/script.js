@@ -127,7 +127,12 @@ function actualizarSecciones(animes) {
         loginRequired.classList.add("oculto");
     }
 
-    animes.forEach((anime) => {
+    const animesOrdenadosPorAnio = [...animes].sort((a, b) => {
+        const anioA = Number(a.anio_emision) || Number.MAX_SAFE_INTEGER;
+        const anioB = Number(b.anio_emision) || Number.MAX_SAFE_INTEGER;
+        return anioA - anioB;
+    });
+    animesOrdenadosPorAnio.forEach((anime) => {
         const estado = anime.estado_usuario || anime.estado;
         const card = document.createElement("div");
         card.classList.add("anime-card");
