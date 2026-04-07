@@ -81,14 +81,23 @@
 
     <div id="seccion-ruleta" class="seccion">
         <h2>Ruleta de Animes</h2>
-        <div class="ruleta-container">
-            <div class="ruleta-wrapper">
-                <div class="flecha"></div>
-                <div id="ruleta-box"></div>
+        <div class="ruleta-scene">
+            <div class="ruleta-container">
+                <div class="ruleta-wrapper">
+                    <div class="flecha"></div>
+                    <div id="ruleta-box"></div>
+                </div>
+                <button id="girarRuleta">Girar Ruleta</button>
             </div>
-            <button id="girarRuleta">Girar Ruleta</button>
+            <div class="ruleta-anime-card" id="ruleta-anime-card">
+                <p class="ruleta-anime-score" id="ruleta-anime-score">---</p>
+                <img id="ruleta-anime-imagen" src="" alt="Anime seleccionado">
+                <h3 id="ruleta-anime-nombre">¿Qué anime saldrá?</h3>
+            </div>
         </div>
-        <div id="resultado-ruleta"></div>
+        <div id="resultado-ruleta" class="resultado-ruleta">
+            <p>Gira la ruleta para obtener una recomendación de la categoría NO VISTO.</p>
+        </div>
     </div>
 
     <div id="anime-modal" class="modal oculto">
