@@ -145,6 +145,7 @@ module.exports = (pool) => {
                 query += " WHERE COALESCE(ua.estado, 'NO VISTO') = 'NO VISTO'";
             } else {
                 query += ' LEFT JOIN user_anime_estado ua ON 1 = 0 ';
+                query += " WHERE a.estado = 'NO VISTO'";
             }
 
             const [results] = await pool.query(query, params);
