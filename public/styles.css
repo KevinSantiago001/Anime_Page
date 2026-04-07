@@ -306,12 +306,27 @@ header {
 #seccion-ruleta {
     display: none; /* Se oculta por defecto y se muestra con JS */
     text-align: center;
-    padding: 20px;
+    padding: 28px;
+    background: radial-gradient(circle at top, #03213f 0%, #010a16 45%, #020611 100%);
+    border: 1px solid rgba(66, 193, 255, 0.35);
+    border-radius: 18px;
+    box-shadow: inset 0 0 25px rgba(34, 158, 255, 0.3), 0 0 45px rgba(0, 65, 121, 0.45);
 }
 
 #seccion-ruleta h2 {
-    margin-bottom: 20px; /* Agrega espacio debajo del título */
-    text-align: center; /* Asegura que el título esté centrado */
+    margin-bottom: 24px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #90dfff;
+    text-shadow: 0 0 12px rgba(64, 219, 255, 0.6);
+}
+
+.ruleta-scene {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    align-items: flex-start;
+    flex-wrap: wrap;
 }
 
 /* Contenedor de la ruleta */
@@ -319,70 +334,112 @@ header {
     display: flex;
     flex-direction: column;
     align-items: center;
+    gap: 18px;
+}
+
+.ruleta-wrapper {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 290px;
+    height: 290px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0, 255, 255, 0.2), rgba(0, 0, 0, 0.8));
+    box-shadow: 0 0 30px rgba(40, 208, 255, 0.55), inset 0 0 20px rgba(50, 255, 255, 0.4);
 }
 
 /* Ruleta */
 #ruleta-box {
-    width: 200px;
-    height: 200px;
+    width: 230px;
+    height: 230px;
     border-radius: 50%;
-    border: 5px solid white;
+    border: 8px solid #cbf6ff;
+    box-shadow: 0 0 25px rgba(132, 227, 255, 0.8), inset 0 0 14px rgba(255, 255, 255, 0.65);
     transition: transform 3s ease-out;
 }
 
 /* Flecha */
 .flecha {
     position: absolute;
-    top: -10px;
+    top: 12px;
     left: 50%;
     transform: translateX(-50%);
     width: 0;
     height: 0;
-    border-left: 10px solid transparent;
-    border-right: 10px solid transparent;
-    border-bottom: 20px solid white;
-}
-
-.anime-imagen-seleccionado {
-    max-width: 200px;  /* Ancho máximo */
-    max-height: 200px; /* Altura máxima */
-    width: auto;       /* Mantiene la proporción */
-    height: auto;      /* Mantiene la proporción */
-    border-radius: 10px; /* Bordes redondeados */
-    display: block;
-    margin: 10px auto; /* Centrar la imagen */
+    border-left: 14px solid transparent;
+    border-right: 14px solid transparent;
+    border-top: 28px solid #f5fbff;
+    filter: drop-shadow(0 0 8px #ffffff);
 }
 
 #girarRuleta {
-    margin-top: 20px; /* Espaciado superior */
-    padding: 12px 25px; /* Tamaño del botón */
-    font-size: 20px; /* Tamaño del texto */
+    padding: 12px 28px;
+    font-size: 22px;
+    font-weight: 700;
+    text-transform: uppercase;
     cursor: pointer;
     border: none;
-    border-radius: 8px;
+    border-radius: 999px;
     color: white;
-    background: linear-gradient(45deg, #ff8c00, #ff4500); /* Degradado naranja-rojo */
+    background: linear-gradient(45deg, #0cb4ff, #1367ff, #8f4dff);
     transition: all 0.3s ease, transform 0.1s ease;
-    box-shadow: 0 4px 10px rgba(255, 69, 0, 0.4); /* Sombra suave */
+    box-shadow: 0 0 20px rgba(22, 153, 255, 0.5);
 }
 
 #girarRuleta:hover {
-    background: linear-gradient(45deg, #ff4500, #ff0000); /* Cambia a un degradado más intenso */
-    transform: scale(1.05); /* Aumenta un poco de tamaño */
-    box-shadow: 0 6px 15px rgba(255, 0, 0, 0.5); /* Brillo más fuerte */
+    transform: scale(1.05);
+    box-shadow: 0 0 26px rgba(92, 227, 255, 0.72);
 }
 
 #girarRuleta:active {
-    transform: scale(0.95); /* Efecto de clic */
+    transform: scale(0.95);
+}
+
+.ruleta-anime-card {
+    min-width: 260px;
+    max-width: 300px;
+    padding: 14px;
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(18, 43, 84, 0.95), rgba(7, 20, 39, 0.95));
+    border: 1px solid rgba(124, 220, 255, 0.45);
+    box-shadow: 0 0 20px rgba(0, 178, 255, 0.35);
+}
+
+.ruleta-anime-score {
+    font-size: 2.1rem;
+    color: #5ee8ff;
+    font-weight: 800;
+    text-shadow: 0 0 14px rgba(94, 232, 255, 0.7);
 }
 
 /* Resultado */
-#resultado-ruleta {
+#ruleta-anime-imagen {
+    width: 170px;
+    height: 240px;
+    object-fit: cover;
+    border-radius: 10px;
+    margin: 8px auto 12px;
+    border: 2px solid rgba(96, 236, 255, 0.8);
     display: none;
-    margin-top: 10px;
-    font-size: 1.2em;
-    font-weight: bold;
-    color: white;
+}
+
+.ruleta-anime-card.activo #ruleta-anime-imagen {
+    display: block;
+}
+
+#ruleta-anime-nombre {
+    font-size: 1.25rem;
+}
+
+.resultado-ruleta {
+    margin: 22px auto 0;
+    max-width: 900px;
+    border: 1px solid rgba(125, 207, 255, 0.5);
+    background: rgba(4, 18, 36, 0.86);
+    padding: 16px 22px;
+    border-radius: 12px;
+    text-align: center;
+    line-height: 1.4;
 }
 
 /* Buscador dentro del header */
@@ -447,6 +504,20 @@ header {
 
     .buscador-container input {
         width: 100%;
+    }
+
+    .ruleta-scene {
+        gap: 20px;
+    }
+
+    .ruleta-wrapper {
+        width: 240px;
+        height: 240px;
+    }
+
+    #ruleta-box {
+        width: 190px;
+        height: 190px;
     }
 }
 
