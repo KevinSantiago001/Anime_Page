@@ -78,7 +78,7 @@ module.exports = (pool) => {
             const requester = await resolveRequester(email);
 
             let query = `
-                SELECT a.*, COALESCE(ua.estado, a.estado) AS estado_usuario
+                SELECT a.*, ${requester.user && !requester.isAdmin ? "COALESCE(ua.estado, 'NO VISTO')" : 'a.estado'} AS estado_usuario
                 FROM animes a
             `;
             const params = [];
@@ -108,7 +108,7 @@ module.exports = (pool) => {
         try {
             const requester = await resolveRequester(email);
             let query = `
-                SELECT a.*, COALESCE(ua.estado, a.estado) AS estado_usuario
+                SELECT a.*, ${requester.user && !requester.isAdmin ? "COALESCE(ua.estado, 'NO VISTO')" : 'a.estado'} AS estado_usuario
                 FROM animes a
             `;
             const params = [];
@@ -134,7 +134,7 @@ module.exports = (pool) => {
         try {
             const requester = await resolveRequester(email);
             let query = `
-                SELECT a.*, COALESCE(ua.estado, a.estado) AS estado_usuario
+                SELECT a.*, ${requester.user && !requester.isAdmin ? "COALESCE(ua.estado, 'NO VISTO')" : 'a.estado'} AS estado_usuario
                 FROM animes a
             `;
             const params = [];
@@ -144,7 +144,7 @@ module.exports = (pool) => {
                 params.push(requester.user.id);
                 query += " WHERE COALESCE(ua.estado, 'NO VISTO') = 'NO VISTO'";
             } else {
-                query += " LEFT JOIN user_anime_estado ua ON 1 = 0 WHERE a.estado = 'NO VISTO'";
+                query += ' LEFT JOIN user_anime_estado ua ON 1 = 0 ';
             }
 
             const [results] = await pool.query(query, params);
